@@ -53,6 +53,63 @@ export default ReactCurrentDispatcher;
 
 코어는 컴포넌트의 모델인 React element 만 알고 있으며, element 를 인스턴스화 되기 전인 클래스라 생각을 한다면 훅은 이 클래스의 인스턴스화된 객체의 상태 값을 관리하는 역할을 한다.
 
-React element 는 fiber 로 확장된 이후에야 살아 숨쉬게 되며, 이 역할은 reconciler 가 한다. 그렇기 때문에 훅 또한 reconciler 가 알고 있는 것이 맞다.
+React element 는 fiber(컴포넌트 및 컴포넌트의 입력과 출력에 대한 정보를 포함한 javascript 객체) 로 확장된 이후에야 살아 숨쉬게 되며, 이 역할은 reconciler 가 한다. 그렇기 때문에 훅 또한 reconciler 가 알고 있는 것이 맞다.
 
-훅 객체는 외부에서 내부로 `ReactCurrentDispatcher.current` 를 통해 주입해준다.
+훅 객체는 외부에서 내부로 `ReactCurrentDispatcher.current` 를 통해 주입해준다. 훅은 `reconciler/renderWithHooks()` 에서 이루어진다. 컴포넌트 호출 또한 여기서 이루어진다.이 함수는 Render phase 에서 실행된다.
+
+### reconciler > ReactFiberHooks.js
+
+```javascript
+export function renderWithHooks(
+  current: Fiber,
+  workInProgress: Fiber,
+  Component: any,
+  props: any,
+  refOrContext: any,
+  nextRenderExpirationTime: ExpirationTime
+) {
+  /*...*/
+  currentlyRenderingFiber = workInProgress; // 현재 작업 중인 fiber를 전역으로 잡아둠
+  nextCurrentHook = current !== null ? current.memoizedState : null;
+
+  ReactCurrentDispatcher.current =
+    nextCurrentHook === null ? HooksDispatcherOnMount : HooksDispatcherOnUpdate;
+
+  let children = Component(props, refOrContext);
+
+  /*컴포넌트 재호출 로직*/
+
+  const renderedWork = currentlyRenderingFiber;
+  renderedWork.memoizedState = firstWorkInProgressHook;
+
+  ReactCurrentDispatcher.current = ContextOnlyDispatcher;
+
+  currentlyRenderingFiber = null;
+  /*...*/
+}
+```
+
+### reconciler > ReactFiberHooks.js
+
+```javascript
+// mount
+const HooksDispatcherOnMount = {
+  useState: mountState,
+  useEffect: mountEffect,
+  /*...*/
+};
+
+// update
+const HooksDispatcherOnUpdate: = {
+  useState: updateState,
+  useEffect: updateEffect,
+  /*...*/
+};
+
+// invalid hook call
+export const ContextOnlyDispatcher: Dispatcher = {
+  useState: throwInvalidHookError,
+  useEffect: throwInvalidHookError,
+  /*...*/
+};
+```
